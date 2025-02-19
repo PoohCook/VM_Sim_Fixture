@@ -1,0 +1,5 @@
+# Put pip dependencies in here for CircleCI to install when testing.
+pyserial
+pycodestyle
+pygount
+freezegun

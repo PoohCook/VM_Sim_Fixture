@@ -1,0 +1,63 @@
+#ifndef DATA_CACHE_H
+#define DATA_CACHE_H
+
+#define FRAME_STATUS_MAX 0x10
+
+#include "vts.h"
+#include <stdbool.h>
+#include <stddef.h>
+
+/*
+ * VTS Frame Command Types
+ */
+typedef enum
+{
+    // card acceptor
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_CONTROL_DATA              = 0x10,
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_SELECTED_ITEM_DATA        = 0x11,
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_BRAND_TABLE_DATA          = 0x14,
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_VM_INITIALIZE             = 0x15,
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_VM_REIMBURSEMENT_DATA     = 0x16,
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_VM_OPEN                   = 0x20,
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_VM_CLOSE                  = 0x21,
+    VTS_DATA_CARD_ACCEPTOR_RECEIVE_SELECTED_BRAND_NUMBER     = 0x22,
+
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_DISPLAY_REQUEST_DATA      = 0x18,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_PURCHASE_RESULT           = 0x19,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_ERROR_DATA                = 0x1A,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_STATUS_DATA               = 0x1B,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_PRINT_REQUEST_DATA        = 0x1C,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_BRAND_STATUS_DATA         = 0x1D,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_TIME_SYNCHRONIZATION      = 0x1F,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_FIXED_DATA                = 0x0D,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_PURCHASE_STATUS_DATA      = 0x28,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_PROCESS_INCOMPLETE_DATA   = 0x29,
+    VTS_DATA_CARD_ACCEPTOR_COMMAND_BRAND_ACCESS_DATA         = 0x2A,
+} VTS_DRIVER_COMMAND;
+
+typedef enum {
+    INVALID_CHANNEL,
+    SEND_CHANNEL,
+    RECEIVE_CHANNEL,
+    STATUS_CHANNEL
+} DATA_CHANNEL;
+
+typedef struct{
+    void (*onDataAvailable)(DATA_CHANNEL channel);
+}DATA_CACHE_INTERFACE_INIT_PARAMS;
+
+typedef struct {
+
+    bool (*init)(DATA_CACHE_INTERFACE_INIT_PARAMS init_params);
+    void (*shutdown)(void);
+    bool(*write_data)( DATA_CHANNEL channel, VTS_FRAME* frame);
+    bool(*read_data)( DATA_CHANNEL channel, VTS_FRAME* frame, int status_frame_index);
+    bool(*clear_data)( DATA_CHANNEL channel);
+    bool(*has_data)( DATA_CHANNEL channel);
+
+} DATA_CACHE_INTERFACE;
+
+extern DATA_CACHE_INTERFACE CACHE_Interface;
+
+
+#endif  //DATA_CACHE_H

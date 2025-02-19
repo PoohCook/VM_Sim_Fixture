@@ -1,0 +1,9 @@
+
+
+
+SWD conn          STLINK-V3MODS
+2     swclk       13 L
+3     gnd         8  L
+4     swdio       4  L
+5     nreset      31 R-
+6     swo         6  L

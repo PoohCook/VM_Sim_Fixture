@@ -1,0 +1,20 @@
+*.d
+*.su
+*.mk
+*.o
+*.DS_Store
+
+*.map
+*.list
+Debug/VM-IOB-STM32L431.map
+.settings/*
+Debug/makefile
+*.launch
+
+*.cyclo
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
