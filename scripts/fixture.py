@@ -7,6 +7,7 @@ from typing import List
 from collections.abc import Iterable
 from enum import Enum
 
+next_frame_id = 0
 
 class Command(Enum):
     Ping = 1
@@ -73,18 +74,28 @@ class DriverStatus(Enum):
 class Packet():
     MAX_TX_DATA_LENGTH = 250
 
-    def __init__(self, command: Command = None, data: List[int] = None) -> None:
+    def __init__(self, command: Command = None, data: List[int] = None, frame_id: int = None) -> None:
         # length / comp_len / command / data / lrc ...  at least 5 chars dead time ///
         self.command = command
         self.data = data if data is not None else []
+        if frame_id is not None:
+            self.frame_id = frame_id
+        else:
+            self.frame_id = self.get_next_frame_id()
+
+    def get_next_frame_id(self):
+        global next_frame_id
+        next_frame_id = (next_frame_id + 1) % 256
+        return next_frame_id
 
     def encode(self):
-        length = len(self.data) + 2
+        length = len(self.data) + 3
         if length > self.MAX_TX_DATA_LENGTH:
             raise ValueError("Provided data exceeds ALLOWED LENGTH")
 
-        header = [length, ~length & 0xff, self.command .value]
+        header = [length, ~length & 0xff, self.command.value, self.frame_id]
         checksum = self.command .value
+        checksum ^= self.frame_id
         for d in self.data:
             checksum ^= d
 
@@ -109,7 +120,7 @@ class Packet():
         if checksum != 0:
             raise ValueError("invalid checksum")
 
-        return cls(Command(input[2]), input[3:-1])
+        return cls(Command(input[2]), input[4:-1], frame_id=input[3])
 
     def __repr__(self) -> str:
         return f"{self.command.name}:{HexCodec.encodeDataStr(self.data)}"

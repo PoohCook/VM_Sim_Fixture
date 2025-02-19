@@ -14,6 +14,7 @@ typedef enum {
   CMD_STATE_LENGTH,
   CMD_STATE_COMPLIMENT,
   CMD_STATE_COMMAND,
+  CMD_STATE_FRAME_ID,
   CMD_STATE_DATA
 } CMD_STATE;
 
@@ -47,6 +48,7 @@ ACTIVITY_TIMER buffering;
 uint8_t frm_len;
 uint8_t rx_len;
   uint8_t command;
+  uint8_t frame_id;
   uint8_t data[MAX_TX_DATA_LENGTH] __attribute__((aligned(16)));  // this needs ot be half word aligned as it gets used
                                                                   // to recieve DMA words
 } CMD_FRAME;

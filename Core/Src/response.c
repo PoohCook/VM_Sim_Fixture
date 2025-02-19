@@ -21,7 +21,7 @@ const osSemaphoreAttr_t responseRingLock_attributes = {
   .cb_size = sizeof(responseRingLockCtlblk),
 };
 
-#if 1
+#if 0
 #define TP_SET(pin){ tp_Set((pin)); }
 #define TP_RESET(pin){ tp_Reset((pin)); }
 #else
@@ -131,7 +131,7 @@ static bool ser_response_send(uint8_t* data, int length){
         return false;
     }
 
-    
+
     resp_tx_in_progress = true;
     activity_initialize(&resp_transmitting, MSEC_PER_CHAR * length);
     activity_refresh(&resp_transmitting);
