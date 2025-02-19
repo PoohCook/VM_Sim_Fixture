@@ -8,11 +8,11 @@
 #include "main.h"
 #include "command.h"
 #include "circular.h"
-#include "ticks.h"
 #include "mux.h"
 #include "adc.h"
 #include "version.h"
 #include "serial.h"
+#include "response.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,46 +28,8 @@
 
 static CIRCULAR_DMA_BUFFER cmd_circ_dma_buffer;
 
-typedef enum {
-    CMD_STATE_LENGTH,
-    CMD_STATE_COMPLIMENT,
-    CMD_STATE_COMMAND,
-    CMD_STATE_DATA
-} CMD_STATE;
-
-typedef enum {
-    Ping = 1,
-    Pong = 2,
-    Ack = 3,
-    Nak = 4,
-    VersionRead = 5,
-    UutPower = 6,
-    SerialSend = 0x10,
-    SerialSendNoWait = 0x11,
-    SerialReset = 0x12,
-    SerialRead = 0x13,
-	SerialSendComRequest = 0x14,
-    SetupMux = 0x20,
-    SyncWrite = 0x21,
-    SyncRead = 0x22,
-    AdcRead = 0x30,
-    DacWrite = 0x31,
-    LedStatus = 0x40
-
-
-} COMMAND;
-
-typedef struct {
-    CMD_STATE state;
-	ACTIVITY_TIMER buffering;
-	uint8_t frm_len;
-	uint8_t rx_len;
-    uint8_t command;
-    uint8_t data[MAX_TX_DATA_LENGTH] __attribute__((aligned(16)));  // this needs ot be half word aligned as it gets used
-                                                                    // to recieve DMA words
-} CMD_FRAME;
 static CMD_FRAME rx_frame;
-static uint8_t tx_frame[MAX_TX_DATA_LENGTH+2];
+static RES_FRAME tx_frame;
 
 static void frame_init(CMD_FRAME* frame){
     TP_SET(TP5);
@@ -168,7 +130,8 @@ static void cmd_send_response(COMMAND command, uint8_t* data, int length){
     }
     tx_frame[3+length] = checksum;
 
-    HAL_UART_Transmit_DMA(&hlpuart1, tx_frame, length+4);
+    //HAL_UART_Transmit_DMA(&hlpuart1, tx_frame, length+4);
+    response_send(&tx_frame);
 }
 
 static void ser_send_with_ack(CMD_FRAME* frame, bool wait){
@@ -227,10 +190,10 @@ static void frame_process(CMD_FRAME* frame){
             cmd_send_response(rx_len == length ? Ack : Nak, frame->data, rx_len);
             break;
 
-        case SerialSendComRequest:
-        	ser_send_com_req();
-        	cmd_send_response(Ack, NULL, 0);
-        	break;
+         case SerialSendComRequest:
+         	ser_send_com_req();
+         	cmd_send_response(Ack, NULL, 0);
+         	break;
 
         case SetupMux:
             if(frame->frm_len != 4){

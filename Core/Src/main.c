@@ -29,6 +29,7 @@
 #include "command.h"
 #include "mux.h"
 #include "serial.h"
+#include "response.h"
 #include <string.h>
 /* USER CODE END Includes */
 
@@ -108,8 +109,8 @@ static void MX_RTC_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_DAC1_Init(void);
-void StartProtocolTask(void *argument);
-void StartFrameTask(void *argument);
+void StartResponseServiceTask(void *argument);
+void StartCommandServiceTask(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -130,6 +131,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart){
 	if(huart == &hlpuart1){
 		cmd_handle_uart_error();
+    resp_handle_uart_error();
 	}
   else if(huart == &huart1){
     ser_handle_uart_error();
@@ -140,6 +142,7 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart){
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart){
 	if(huart == &hlpuart1){
     cmd_handle_uart_complete();
+    resp_handle_uart_complete();
 	}
   else if(huart == &huart1){
     ser_handle_uart_complete();
@@ -241,10 +244,10 @@ int main(void)
 
   /* Create the thread(s) */
   /* creation of protocolTask */
-  protocolTaskHandle = osThreadNew(StartProtocolTask, NULL, &protocolTask_attributes);
+  protocolTaskHandle = osThreadNew(StartResponseServiceTask, NULL, &protocolTask_attributes);
 
   /* creation of frameTask */
-  frameTaskHandle = osThreadNew(StartFrameTask, NULL, &frameTask_attributes);
+  frameTaskHandle = osThreadNew(StartCommandServiceTask, NULL, &frameTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
 
@@ -884,18 +887,15 @@ void tp_Toggle(TEST_PIN pin){
   * @retval None
   */
 /* USER CODE END Header_StartProtocolTask */
-void StartProtocolTask(void *argument)
+void StartResponseServiceTask(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  // com_initialized = false;
-  // activity_initialize(&com_init_activity, COM_INIT_TIMEOUT);
+  response_initialize();
 
 	while(1){
     TP_SET(TP9);
-    // if(!com_initialized && activity_isExpired(&com_init_activity)){
-    //   reinitialize_com();
-    //   com_initialized = true;
-    // }
+    response_serviceSend();
+    osDelay(1);
 
     TP_RESET(TP9);
 	}
@@ -909,7 +909,7 @@ void StartProtocolTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartFrameTask */
-void StartFrameTask(void *argument)
+void StartCommandServiceTask(void *argument)
 {
   /* USER CODE BEGIN StartFrameTask */
   TP_SET(TP10);

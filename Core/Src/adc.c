@@ -10,7 +10,7 @@
 #include "ticks.h"
 #include <stdlib.h>
 
-#if 1
+#if 0
 #define TP_SET(pin){ tp_Set((pin)); }
 #define TP_RESET(pin){ tp_Reset((pin)); }
 #else

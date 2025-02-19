@@ -22,7 +22,7 @@ class HtSimulator():
 
         # self.__framework.pause()
         data_out = HexCodec.encodeDataStr([i for i in range(40)])
-        for i in range(100):
+        for i in range(10):
             self.__framework.fixtureSerialSendComRequest()
             self.__framework.fixtureSerialSendData(data=data_out, wait=True)
             time.sleep(0.1)
