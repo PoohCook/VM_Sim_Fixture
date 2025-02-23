@@ -30,6 +30,8 @@ typedef enum {
   SerialReset = 0x12,
   SerialRead = 0x13,
   SerialSendComRequest = 0x14,
+  SerialWaitComRequest = 0x15,
+  SerialComReqDetected = 0x16,
   SetupMux = 0x20,
   SyncWrite = 0x21,
   SyncRead = 0x22,
@@ -60,5 +62,6 @@ void cmd_handle_uart_error();
 void cmd_handle_uart_complete();
 void cmd_init_interface();
 void cmd_service();
+void cmd_send_response(COMMAND command, uint8_t frame_id, uint8_t* data, int length);
 
 #endif  //__COMMAND__

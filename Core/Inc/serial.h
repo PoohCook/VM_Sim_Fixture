@@ -12,9 +12,11 @@
 void ser_initialize(void);
 void ser_handle_uart_error();
 void ser_handle_uart_complete();
+void ser_gpio_edge_callback(uint16_t GPIO_Pin);
 bool ser_send(uint8_t* data, int length, bool wait);
 void ser_reset(void);
 int ser_read(uint8_t* data, int length);
 void ser_send_com_req();
+void ser_set_wait_com_req(uint8_t frame_id);
 
 #endif //  __SERIAL__

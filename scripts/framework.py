@@ -82,6 +82,8 @@ class TestFramework():
         self.parameters = None
         self.load_parameters(args)
 
+        print(f"Parameters: {self.parameters}, Args: {args}")
+
         if self.args and self.args.serial_number:
             self.__validate_serial_number(self.args.serial_number)
 
@@ -94,6 +96,7 @@ class TestFramework():
         self.__records = []
         self.__record = None
         self.__fixture_port = FixturePort(device=fixture_device)
+        self.__fixture_port.flush()
         self.__console_port = None
         self.__console_device = console_device
         self.__record = TestRecord(name="Framework")
@@ -238,7 +241,21 @@ class TestFramework():
         packet = Packet(command=Command.SerialSendComRequest)
         response = self.__fixture_port.send(packet=packet)
         if response.command != Command.Ack:
-            raise RuntimeError(f"Fixture unable to reset serial: {response}")
+            raise RuntimeError(f"Fixture unable to send com request: {response}")
+
+    def fixtureSerialSendWaitComRequest(self):
+        self.addStepNote("Fixture: Send Serial Wait Com request")
+        packet = Packet(command=Command.SerialWaitComRequest)
+        response = self.__fixture_port.send(packet=packet)
+        if response.command != Command.Ack:
+            raise RuntimeError(f"Fixture unable to setup com request wait: {response}")
+
+        packet = None
+        while packet is None or packet.command != Command.SerialComReqDetected:
+            packet = self.__fixture_port.read_packet(timeout=30.0)
+            print(f"packet: {packet}")
+        return True
+
 
     def getKeyboardChar(self):
         try:

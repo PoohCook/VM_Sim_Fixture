@@ -123,8 +123,17 @@ __weak void EXTI0_IRQHandler(void){
   HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+__weak void EXTI9_5_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
+}
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_9)
+    {
+      ser_gpio_edge_callback(GPIO_Pin);
+    }
 }
 
 // this a a Hack to handel distrbuting this gloabl to various consumers

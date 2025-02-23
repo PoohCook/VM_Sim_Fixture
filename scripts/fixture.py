@@ -21,6 +21,8 @@ class Command(Enum):
     SerialReset = 0x12
     SerialRead = 0x13
     SerialSendComRequest = 0x14
+    SerialWaitComRequest = 0x15
+    SerialComReqDetected = 0x16
     SetupMux = 0x20
     SyncWrite = 0x21
     SyncRead = 0x22
@@ -138,6 +140,10 @@ class FixturePort():
         self.__port = serial.Serial(port=device, baudrate=baud, parity=parity, timeout=0.5,
                                     rtscts=False, dsrdtr=False, xonxoff=False)
 
+    def flush(self):
+        self.__port.flushInput()
+        self.__port.flushOutput()
+
     def send(self, packet: Packet, sync: bool = True, timeout: float = 0.5) -> Packet:
         data = packet.encode()
         for c in data:
@@ -163,6 +169,16 @@ class FixturePort():
     def close(self):
         self.__port.close()
 
+    def read_packet(self, timeout: float = 0.5):
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            print(f"reading at: {time.time() - start_time}")
+            try:
+                return self.read()
+            except ValueError:
+                pass
+
+        return None
 
 if __name__ == "__main__":
     commands = "\n    ".join([e.name for e in Command])

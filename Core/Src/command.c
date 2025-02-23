@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if 1
+#if 0
 #define TP_SET(pin){ tp_Set((pin)); }
 #define TP_RESET(pin){ tp_Reset((pin)); }
 #else
@@ -132,8 +132,7 @@ static bool frame_data_read(CMD_FRAME* frame, CIRCULAR_DMA_BUFFER* circ){
     return false;
 }
 
-
-static void cmd_send_response(COMMAND command, uint8_t frame_id, uint8_t* data, int length){
+void cmd_send_response(COMMAND command, uint8_t frame_id, uint8_t* data, int length){
 
     memset(tx_frame, 0, sizeof(tx_frame));
     tx_frame[0] = length + 3;
@@ -153,10 +152,10 @@ static void cmd_send_response(COMMAND command, uint8_t frame_id, uint8_t* data, 
 }
 
 static void ser_send_with_ack(CMD_FRAME* frame, bool wait){
-    if(!ser_send(frame->data, frame->frm_len-2, wait)){
+    if(!ser_send(frame->data, frame->frm_len-3, wait)){
         cmd_send_response(Nak, frame->frame_id, NULL, 0);
     } else{
-        cmd_send_response(Ack, frame->frame_id,frame->data, frame->frm_len-2);
+        cmd_send_response(Ack, frame->frame_id,frame->data, frame->frm_len-3);
     }
 }
 
@@ -212,6 +211,11 @@ static void frame_process(CMD_FRAME* frame){
          	ser_send_com_req();
          	cmd_send_response(Ack, frame->frame_id, NULL, 0);
          	break;
+
+        case SerialWaitComRequest:
+            ser_set_wait_com_req(frame->frame_id);
+            cmd_send_response(Ack, frame->frame_id, NULL, 0);
+            break;
 
         case SetupMux:
             if(frame->frm_len != 5){
