@@ -34,8 +34,9 @@ class TestArguments(ArgumentParser):
 
 
 class TestRecord():
-    def __init__(self, name) -> None:
+    def __init__(self, name, mute_std = False ) -> None:
         self.name = name
+        self.mute_std = mute_std
         self.steps = []
         self.results = {}
 
@@ -45,21 +46,24 @@ class TestRecord():
 
     def addStep(self, step):
         msg = f"{self.getLeader()}: {step}"
-        print(msg)
+        if not self.mute_std:
+            print(msg)
         self.steps.append(msg)
 
     def addBreak(self):
-        print("____________________")
+        if not self.mute_std:
+            print("____________________")
 
     def addResult(self, name, result):
         self.results[name] = {
             "result": result
         }
-        if result:
-            print(f"{self.getLeader()}: [{name}]: passed")
-        else:
-            print(f"{self.getLeader()}: [{name}]: FAILED!")
-        self.addBreak()
+        if not self.mute_std:
+            if result:
+                print(f"{self.getLeader()}: [{name}]: passed")
+            else:
+                print(f"{self.getLeader()}: [{name}]: FAILED!")
+            self.addBreak()
 
     def passed(self):
         return all(v['result'] for v in self.results.values())
@@ -81,8 +85,6 @@ class TestFramework():
         self.args = args
         self.parameters = None
         self.load_parameters(args)
-
-        print(f"Parameters: {self.parameters}, Args: {args}")
 
         if self.args and self.args.serial_number:
             self.__validate_serial_number(self.args.serial_number)
@@ -163,8 +165,8 @@ class TestFramework():
         if cycle:
             time.sleep(2)
 
-    def start(self, test_name):
-        self.__record = TestRecord(name=test_name)
+    def start(self, test_name, mute_std = False):
+        self.__record = TestRecord(name=test_name, mute_std=mute_std)
         self.__records.append(self.__record)
         self.__record.addBreak()
         self.addStepNote(f"Start: {test_name}")
@@ -253,7 +255,6 @@ class TestFramework():
         packet = None
         while packet is None or packet.command != Command.SerialComReqDetected:
             packet = self.__fixture_port.read_packet(timeout=30.0)
-            print(f"packet: {packet}")
         return True
 
 

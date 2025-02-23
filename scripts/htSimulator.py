@@ -1,9 +1,11 @@
 #! /usr/bin/env python3
 import argparse
 import time
+import json
 from analog import *
 from framework import *
 from tenht import codec, HtDataFrame, HtRecord
+from htCounter import HtCounter
 
 
 class HtSimulator():
@@ -13,119 +15,115 @@ class HtSimulator():
         self.ht_codec = codec.HtRecordCodec()
         self.ht_codec.set_htConfig(self.htConfig)
 
+    def load_config(self):
+        with open("ht_simulator.cfg", "r") as f:
+            cfg = json.load(f)
+
+        self.htConfig = cfg["htConfig"]
+        self.columns = cfg["columns"]
+        self.__counters = []
+
+        for cntr in cfg["counters"]:
+            self.__counters.append(HtCounter(cfg=cntr))
+
+    def save_config(self):
+        cfg = {
+            "htConfig": self.htConfig,
+            "columns": self.columns,
+            "counters": []
+        }
+
+        for c in self.__counters:
+            cfg["counters"].append(c.render())
+
+        with open("ht_simulator.cfg", "w") as f:
+            json.dump(cfg, f, indent=2)
+
+    def get_counter(self, counter):
+        for c in self.__counters:
+           if c.ht_code == counter:
+                return c
+        return None
+
+    def wait_com_request(self):
+        if self.__framework.fixtureSerialSendWaitComRequest():
+            self.__framework.fixtureSerialReset()
+            self.send_ack()
+            return True
+        return False
+
+    def send_ack(self):
+        data_out = HexCodec.encodeDataStr([17])  # 0x11 Ack
+        self.__framework.fixtureSerialSendData(data=data_out, wait=True)
+
+    def receive_records(self):
+        data_in = self.__framework.fixtureSerialRead(240, expect_ack=False)
+        data_in = HexCodec.decodeDataStr(data_in)
+
+        result = self.ht_codec.decodeRecords([HtDataFrame(data_in)])
+        self.send_ack()
+        return result
+
+    def extract_records(self, code, records):
+        for record in records:
+            if record.ht_code == code:
+                return record.items
+        return []
+
+    def encode_hex(self, codes):
+        hex_codes = [int(c, 16) for c in codes]
+        return hex_codes
+
     def run(self):
-        self.__framework.start("HT Mosi loopback")
+        self.__framework.start("HT Simulator", mute_std=True)
+        self.load_config()
 
         # setup mux for
         #       output HT:MC_MOSI_TX       -->
-        #       input  HT:IR_MOSI_RX       <--
+        #       input  HT:MC_MISO_RX       <--
         self.__framework.fixtureSetMux(InputMux.HtMcMiso, OutputMux.HtMcMosi)
         self.__framework.fixtureSerialReset()
-        # self.__framework.consoleSend(command="test_ht reset")
-        # self.__framework.consoleSend(command="test_ht passthrough on")
 
-        # self.__framework.pause()
-        # data_out = HexCodec.encodeDataStr([17])
-        # self.__framework.fixtureSerialSendData(data=data_out, wait=True)
-        # for i in range(10):
-        #     self.__framework.fixtureSerialSendWaitComRequest()
-        #     self.__framework.fixtureSerialSendComRequest()
-        #     self.__framework.fixtureSerialReset()
-        #     self.__framework.fixtureSerialSendData(data=data_out, wait=True)
-        #     self.__framework.fixtureSerialRead(10)
+        self.run_request_loop()
 
-        #     time.sleep(0.5)
+        self.save_config()
 
-        if self.__framework.fixtureSerialSendWaitComRequest():
-            self.__framework.fixtureSerialReset()
-            data_out = HexCodec.encodeDataStr([17])  # 0x11 Ack
-            self.__framework.fixtureSerialSendData(data=data_out, wait=True)
+    def run_request_loop(self):
+        while True:
+            try:
+                if self.wait_com_request():
+                    self.process_request()
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                print("Error: {e}")
+                pass
 
-        data_in = self.__framework.fixtureSerialRead(240, expect_ack=False)
-        data_in = HexCodec.decodeDataStr(data_in)
+    def process_request(self):
+        security_recs = self.receive_records()
+        cred1 = self.extract_records(0x0d0b, security_recs)
+        cred2 = self.extract_records(0x0d0d, security_recs)
+        print(F"result cred1: {cred1} cred2: {cred2}")
 
-        result = self.ht_codec.decodeRecords([HtDataFrame(data_in)])
-        print(F"result set 1: {result}")
+        command_recs = self.receive_records()
 
-        data_out = HexCodec.encodeDataStr([17])  # 0x11 Ack
-        self.__framework.fixtureSerialSendData(data=data_out, wait=True)
+        action = self.extract_records(0x0aa0, command_recs)[0]
+        codes = self.extract_records(0x0a1a, command_recs)
+        hex_codes = self.encode_hex(codes)
+        print(f"processing action: {action}, codes: {codes}")
 
-        data_in = self.__framework.fixtureSerialRead(240, expect_ack=False)
-        data_in = HexCodec.decodeDataStr(data_in)
+        for code in hex_codes:
+            items = self.get_counter(code).encode_values()
 
-        result = self.ht_codec.decodeRecords([HtDataFrame(data_in)])
-        print(F"result set 2: {result}")
+            out_frame = HtRecord(ht_code=code, item_length=4, items=items)
+            out_data = self.ht_codec.encodeRecords([out_frame])
 
-        data_out = HexCodec.encodeDataStr([17])  # 0x11 Ack
-        self.__framework.fixtureSerialSendData(data=data_out, wait=True)
+            for data in out_data:
+                data_out = HexCodec.encodeDataStr(data.data)
+                self.__framework.fixtureSerialSendData(data=data_out, wait=True)
 
-        action = 'none'
-        codes = []
-
-        for record in result:
-            if record.ht_code == 0x0aa0:
-                action = record.items[0]
-            if record.ht_code == 0x0a1a:
-                codes = record.items
-
-        code_hex = [int(c, 16) for c in codes]
-        print(f"action: {action}, codes: {codes}, hex: {code_hex}")
-
-        read_code = int(codes[0], 16)
-        values = [i for i in range(0, 28)]
-        items = [f"{c:04X}" for c in values]
-        print(f"items: {items}")
-
-        out_frame = HtRecord(ht_code=code_hex[0], item_length=4, items=items)
-        print(f"out_frame: {out_frame}")
-        out_data = self.ht_codec.encodeRecords([out_frame])
-        print(f"out_data: {out_data}")
-
-        for data in out_data:
-            data_out = HexCodec.encodeDataStr(data.data)
-            self.__framework.fixtureSerialSendData(data=data_out, wait=True)
-
-        data_in = self.__framework.fixtureSerialRead(200, expect_ack=False)
-        print(f"read code: {read_code}, data in: {data_in}")
-
-        # time.sleep(0.01)
-        # adcData = self.__framework.fixtureAdcReadData(channel=SenseChannel.SenseHtIrMosi, size=120)
-        # classes = AnalogData.clasifyAnalogData(adcData, [0.5, 10.0])
-        # self.__framework.addStepNote(f"Driver Voltage Classes: {classes}")
-
-        # self.__framework.pause()
-        # data_in = self.__framework.fixtureSerialRead(40)
-        # result = self.__framework.consoleSend(command="test_ht read")
-        # con_in = parseData(result[0])
-
-        # # print("data_in", type(data_in), data_in)
-        # # print("data_out", type(data_out), data_out)
-        # # print("data_con", type(con_in), con_in)
-        # self.__framework.addResult(name="HT Passthrough on",
-        #                            result=(data_out == data_in) and (data_in == con_in))
-        # self.__framework.addResult(name="HT Mosi Driver Voltages",
-        #                            result=(classes[0] > 20 and classes[2] > 20))
-
-        # self.__framework.consoleSend(command="test_ht reset")
-        # self.__framework.consoleSend(command="test_ht passthrough off")
-
-        # self.__framework.pause()
-        # data_out = '[80,81,82,83,84,85,86,87,88,89,8a,8b,8c,8d,8e,8f]'
-        # self.__framework.fixtureSerialSendData(data_out)
-
-        # self.__framework.pause()
-        # data_in = self.__framework.fixtureSerialRead(16, expect_ack=False)
-        # result = self.__framework.consoleSend(command="test_ht read")
-        # con_in = parseData(result[0])
-
-        # data_out2 = "[30,31,32,33,34,35,36,37,38,39,3a,3b,3c,3d,3e,3f]"
-        # self.__framework.consoleSend(command=f"test_ht send {data_out2}")
-
-        # self.__framework.pause()
-        # data_in2 = self.__framework.fixtureSerialRead(16, expect_ack=False)
-
-        # self.__framework.addResult(name="HT Passthrough off",
-        #                            result=(data_in == "[]") and (con_in == data_out) and (data_in2 == "[]"))
+            data_in = self.__framework.fixtureSerialRead(100, expect_ack=False)
+            print(f"received: {data_in}")
 
 
 if __name__ == "__main__":
@@ -133,11 +131,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     framework = TestFramework(args=args, spinup=False)
 
-    def tests():
-        test = HtSimulator(framework)
-        test.run()
-
-    framework.run(tests)
+    test = HtSimulator(framework)
+    test.run()
 
     # framework.report()
     framework.shutdown()

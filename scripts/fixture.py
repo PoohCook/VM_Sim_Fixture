@@ -172,7 +172,6 @@ class FixturePort():
     def read_packet(self, timeout: float = 0.5):
         start_time = time.time()
         while time.time() - start_time < timeout:
-            print(f"reading at: {time.time() - start_time}")
             try:
                 return self.read()
             except ValueError:
