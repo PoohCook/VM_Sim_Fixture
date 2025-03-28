@@ -231,7 +231,7 @@ class TestFramework():
     def fixtureSerialRead(self, size: int, expect_ack: bool = True):
         self.addStepNote(f"Fixture: Read Data({size})")
         packet = Packet(command=Command.SerialRead, data=[size])
-        response = self.__fixture_port.send(packet=packet)
+        response = self.__fixture_port.send(packet=packet, timeout=3.0)
         if expect_ack and response.command != Command.Ack:
             raise RuntimeError(f"Fixture unable to fetch serial data: {response}")
         data = HexCodec.encodeDataStr(response.data)

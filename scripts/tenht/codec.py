@@ -117,7 +117,7 @@ class HtRecordCodec():
         check = reduce(xor, frameData) ^ 0xff
         frameData = [0xf2, *frameData, 0xff, check]
 
-        frame_size = 120
+        frame_size = 240
         frames = [HtDataFrame(data=frameData[i: i + frame_size]) for i in range(0, len(frameData), frame_size)]
         frames[-1].set_end()
         return frames

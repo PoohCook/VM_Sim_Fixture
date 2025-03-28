@@ -92,6 +92,7 @@ class Packet():
 
     def encode(self):
         length = len(self.data) + 3
+        datap = [f"{d:02x}" for d in self.data]
         if length > self.MAX_TX_DATA_LENGTH:
             raise ValueError("Provided data exceeds ALLOWED LENGTH")
 

@@ -86,7 +86,7 @@ class HtSimulator():
 
         self.run_request_loop()
 
-        self.save_config()
+        # self.save_config()
 
     def run_request_loop(self):
         while True:
@@ -96,34 +96,48 @@ class HtSimulator():
             except KeyboardInterrupt:
                 break
             except Exception as e:
-                print("Error: {e}")
+                self.log(f"Error: {e}")
                 pass
+
+    def log(self, msg):
+        print(f"\nLOG: {msg}")
 
     def process_request(self):
         security_recs = self.receive_records()
         cred1 = self.extract_records(0x0d0b, security_recs)
         cred2 = self.extract_records(0x0d0d, security_recs)
-        print(F"result cred1: {cred1} cred2: {cred2}")
+        self.log(F"result cred1: {cred1} cred2: {cred2}")
 
         command_recs = self.receive_records()
 
         action = self.extract_records(0x0aa0, command_recs)[0]
         codes = self.extract_records(0x0a1a, command_recs)
         hex_codes = self.encode_hex(codes)
-        print(f"processing action: {action}, codes: {codes}")
+        self.log(f"processing action: {action}, codes: {codes}")
 
         for code in hex_codes:
-            items = self.get_counter(code).encode_values()
+            counter = self.get_counter(code)
+            items = counter.encode_values()
+            self.log(f"counter: {code:04X}, items: {items}")
 
-            out_frame = HtRecord(ht_code=code, item_length=4, items=items)
+            out_frame = HtRecord(ht_code=code, item_length=counter.size, items=items)
             out_data = self.ht_codec.encodeRecords([out_frame])
 
             for data in out_data:
                 data_out = HexCodec.encodeDataStr(data.data)
-                self.__framework.fixtureSerialSendData(data=data_out, wait=True)
+                self.__framework.fixtureSerialSendData(data=data_out, wait=False)
 
-            data_in = self.__framework.fixtureSerialRead(100, expect_ack=False)
-            print(f"received: {data_in}")
+            resp = self.get_response()
+            self.log(f"response received: {resp}")
+
+    def get_response(self):
+        start_time = time.time()
+        while (time.time() - start_time) < 2.0:
+            data_in = self.__framework.fixtureSerialRead(20, expect_ack=False)
+            if len(data_in) > 2:
+                return data_in
+
+        return "[]"
 
 
 if __name__ == "__main__":
