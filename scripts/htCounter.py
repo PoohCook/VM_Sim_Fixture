@@ -18,3 +18,12 @@ class HtCounter():
             "size": self.size,
             "values": self.encode_values()
         }
+
+    def set_value(self, index: int, value: int) -> None:
+        self.values[index] = value
+
+    def inc_value(self, index: int) -> None:
+        self.values[index] = self.values[index] + 1
+
+    def get_value(self, index: int) -> int:
+        return self.values[index]

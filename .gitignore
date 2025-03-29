@@ -17,4 +17,4 @@ Debug/makefile
 __pycache__/
 *.py[cod]
 *$py.class
-
+ht_simulator.log

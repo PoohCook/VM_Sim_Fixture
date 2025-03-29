@@ -6,10 +6,14 @@ from analog import *
 from framework import *
 from tenht import codec, HtDataFrame, HtRecord
 from htCounter import HtCounter
+from threading import Thread
+from serial.serialutil import SerialException
+from datetime import datetime
 
-
-class HtSimulator():
+class HtSimulator(Thread):
     def __init__(self, framework: TestFramework) -> None:
+        super().__init__()
+
         self.__framework = framework
         self.htConfig = "0d0b00061038899869950d0d0006109158597797f936d1d031"
         self.ht_codec = codec.HtRecordCodec()
@@ -39,7 +43,7 @@ class HtSimulator():
         with open("ht_simulator.cfg", "w") as f:
             json.dump(cfg, f, indent=2)
 
-    def get_counter(self, counter):
+    def get_counter(self, counter) -> HtCounter:
         for c in self.__counters:
            if c.ht_code == counter:
                 return c
@@ -78,13 +82,16 @@ class HtSimulator():
         self.__framework.start("HT Simulator", mute_std=True)
         self.load_config()
 
+        self.setup_mux()
+
+        self.run_request_loop()
+
+    def setup_mux(self):
         # setup mux for
         #       output HT:MC_MOSI_TX       -->
         #       input  HT:MC_MISO_RX       <--
         self.__framework.fixtureSetMux(InputMux.HtMcMiso, OutputMux.HtMcMosi)
         self.__framework.fixtureSerialReset()
-
-        self.run_request_loop()
 
         # self.save_config()
 
@@ -95,12 +102,16 @@ class HtSimulator():
                     self.process_request()
             except KeyboardInterrupt:
                 break
+            except SerialException:
+                break
             except Exception as e:
-                self.log(f"Error: {e}")
+                self.log(f"Req Error: {e}, {type(e)}")
                 pass
 
     def log(self, msg):
-        print(f"\nLOG: {msg}")
+        with open("ht_simulator.log", "a") as f:
+            msg_with_timestamp = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]} {msg}\n"
+            f.write(msg_with_timestamp)
 
     def process_request(self):
         security_recs = self.receive_records()
@@ -139,6 +150,91 @@ class HtSimulator():
 
         return "[]"
 
+    def process_ui_command(self, command):
+        match = re.match(r"(\w+)\s+(\w+)\[(\d+)\](?:=(\d+))?", command)
+
+        if match:
+            result = list(match.groups())
+            # ['set', '0BC4', '8', '123']
+            action = result[0]
+            counter = int(result[1],16)
+            index = int(result[2])
+            value = int(result[3]) if result[3] else None
+            if action.lower() == "set":
+                self.set_counter_value(counter, index, value)
+                return
+
+            if action.lower() == "inc":
+                self.inc_counter_value(counter, index)
+                return
+
+            if action.lower() == "get":
+                self.get_counter_value(counter, index)
+                return
+
+            else:
+                print(f"action {action} not recognized")
+
+        else:
+            print("command not recognized")
+
+    def set_counter_value(self, counter, index, value):
+        counter = self.get_counter(counter)
+        if counter is None:
+            print(f"counter {counter} not found")
+            return
+
+        if index >= counter.size:
+            print(f"index {index} out of range")
+            return
+
+        if value is None:
+            print("value not specified")
+            return
+
+        counter.set_value(index, value)
+        self.save_config()
+
+    def inc_counter_value(self, counter, index):
+        counter = self.get_counter(counter)
+        if counter is None:
+            print(f"counter {counter} not found")
+            return
+
+        if index >= counter.size:
+            print(f"index {index} out of range")
+            return
+
+        counter.inc_value(index)
+        self.save_config()
+
+    def get_counter_value(self, counter, index):
+        counter = self.get_counter(counter)
+        if counter is None:
+            print(f"counter {counter} not found")
+            return
+        if index >= counter.size:
+            print(f"index {index} out of range")
+            return
+        value = counter.get_value(index)
+        print(f"{counter.ht_code:04X}[{index}]={value}")
+
+    def run_ui(self):
+        while True:
+            try:
+                response = input("SIM: ")
+                self.process_ui_command(response)
+            except KeyboardInterrupt:
+                break
+            except Exception as e:
+                self.log(f"Error: {e}")
+                pass
+
+        try:
+            self.__framework.shutdown()
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     parser = TestArguments("HtTestMosi")
@@ -146,7 +242,6 @@ if __name__ == "__main__":
     framework = TestFramework(args=args, spinup=False)
 
     test = HtSimulator(framework)
-    test.run()
-
-    # framework.report()
-    framework.shutdown()
+    test.start()
+    time.sleep(0.5)
+    test.run_ui()
